@@ -40,6 +40,21 @@ class HealthCheckFailed(Exception):
     pass
 
 
+def docker_client():
+    # docker.from_env() ignores the current context configuration.
+    # https://github.com/docker/docker-py/issues/3146
+
+    ctx = docker_module.ContextAPI.get_current_context()
+
+    base_url = os.environ.get("DOCKER_HOST", ctx.Host)
+
+    docker = docker_module.DockerClient(
+        base_url=base_url,
+        version="auto",
+    )
+    return docker
+
+
 def get_gateway_ip(container: Container) -> str:
     gateway = os.getenv("TOX_DOCKER_GATEWAY")
     if gateway:
@@ -124,7 +139,7 @@ def docker_build_or_pull(container_config: ContainerConfig) -> None:
 def docker_pull(container_config: ContainerConfig) -> None:
     assert container_config.image
 
-    docker = docker_module.from_env(version="auto")
+    docker = docker_client()
 
     try:
         docker.images.get(str(container_config.image))
@@ -163,7 +178,7 @@ def docker_run(
     container_config: ContainerConfig,
     running_containers: RunningContainers,
 ) -> Container:
-    docker = docker_module.from_env(version="auto")
+    docker = docker_client()
 
     healthcheck: Dict[str, Union[List[str], int]] = {}
     if container_config.healthcheck_cmd:
@@ -215,8 +230,6 @@ def docker_run(
 def docker_health_check(
     container_config: ContainerConfig, container: Container
 ) -> None:
-    docker = docker_module.from_env(version="auto")
-
     if "Health" in container.attrs["State"]:
         log(f"health check {container_config.name!r}")
         while True:
@@ -241,7 +254,7 @@ def docker_stop(container_config: ContainerConfig, container: Container) -> None
 
 
 def docker_get(container_config: ContainerConfig) -> Optional[Container]:
-    docker = docker_module.from_env(version="auto")
+    docker = docker_client()
     try:
         return docker.containers.get(container_config.runas_name)
     except NotFound:
