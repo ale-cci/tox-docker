@@ -23,6 +23,7 @@ from tox.session.state import State
 from tox.tox_env.api import ToxEnv
 from tox.tox_env.errors import Fail
 import docker as docker_module
+import docker.utils
 
 from tox_docker.config import (
     ContainerConfig,
@@ -46,11 +47,12 @@ def docker_client():
 
     ctx = docker_module.ContextAPI.get_current_context()
 
-    base_url = os.environ.get("DOCKER_HOST", ctx.Host)
+    params = docker_module.utils.kwargs_from_env(os.environ)
+    params.setdefault("base_url", ctx.Host)
 
     docker = docker_module.DockerClient(
-        base_url=base_url,
         version="auto",
+        **params,
     )
     return docker
 
